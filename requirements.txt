@@ -1,0 +1,6 @@
+flask>=3.0
+onnxruntime>=1.17
+numpy
+requests
+pillow
+gunicorn

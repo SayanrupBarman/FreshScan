@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FreshScan — Fruit Freshness Detector</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+  </script>
+</head>
+<body>
+
+<!-- ─── Animated Background ─────────────────────────────── -->
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+<div class="bubbles" aria-hidden="true">
+  <span class="bubble">🍎</span>
+  <span class="bubble">🍌</span>
+  <span class="bubble">🍊</span>
+  <span class="bubble">🍏</span>
+  <span class="bubble">🍋</span>
+  <span class="bubble">🥝</span>
+  <span class="bubble">🍇</span>
+  <span class="bubble">🍑</span>
+  <span class="bubble">🫐</span>
+  <span class="bubble">🍓</span>
+</div>
+
+<!-- ─── Header ─────────────────────────────────────────── -->
+<header>
+  <div class="logo">🍎 FreshScan</div>
+  <p class="tagline">AI + IoT Fruit Freshness Scoring</p>
+</header>
+
+<main>
+
+  <!-- ─── Step 1 : Upload / Camera ─────────────────────── -->
+  <section class="card" id="upload-card">
+    <h2><span class="step">1</span> Capture or Upload Fruit Image</h2>
+
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="upload-mode-btn">Upload</button>
+      <button class="mode-btn" id="camera-mode-btn">📷 Camera</button>
+    </div>
+
+    <!-- Upload mode -->
+    <div id="upload-area">
+      <div id="drop-zone">
+        <input type="file" id="file-input" accept="image/*" hidden />
+        <div id="drop-prompt">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>Drag & drop an image here, or <span class="link">browse</span></p>
+        </div>
+        <img id="preview" alt="preview" />
+      </div>
+    </div>
+
+    <!-- Camera mode -->
+    <div id="camera-area" class="hidden">
+      <div id="camera-container">
+        <video id="camera-feed" autoplay playsinline></video>
+        <canvas id="camera-canvas" hidden></canvas>
+        <img id="camera-preview" alt="captured" />
+      </div>
+      <div class="camera-controls">
+        <button id="capture-btn" class="btn secondary">📸 Take Photo</button>
+        <button id="retake-btn" class="btn secondary hidden">↩ Retake</button>
+      </div>
+    </div>
+
+    <button id="analyze-btn" class="btn primary" disabled>Analyze Freshness</button>
+  </section>
+
+  <!-- ─── Step 2 : ML Result ───────────────────────────── -->
+  <section class="card hidden" id="ml-card">
+    <h2><span class="step">2</span> ML Prediction</h2>
+
+    <div class="result-grid">
+      <div class="metric-box">
+        <span class="label">Fruit</span>
+        <span class="value" id="fruit-name">—</span>
+      </div>
+      <div class="metric-box">
+        <span class="label">Freshness</span>
+        <span class="value" id="freshness-label">—</span>
+      </div>
+      <div class="metric-box wide">
+        <span class="label">ML Freshness Score</span>
+        <div class="bar-wrap">
+          <div class="bar" id="ml-bar"></div>
+        </div>
+        <span class="value" id="ml-score">—</span>
+      </div>
+    </div>
+
+    <button id="sensor-btn" class="btn secondary">Fetch Sensor Data</button>
+  </section>
+
+  <!-- ─── Step 3 : Sensor Data ─────────────────────────── -->
+  <section class="card hidden" id="sensor-card">
+    <h2><span class="step">3</span> IoT Sensor Data</h2>
+
+    <div class="result-grid">
+      <div class="metric-box">
+        <span class="label">Temperature</span>
+        <span class="value" id="temperature">—</span>
+      </div>
+      <div class="metric-box">
+        <span class="label">Humidity</span>
+        <span class="value" id="humidity">—</span>
+      </div>
+      <div class="metric-box">
+        <span class="label">Air Quality</span>
+        <span class="value" id="air-quality">—</span>
+      </div>
+      <div class="metric-box">
+        <span class="label">Sensor Freshness</span>
+        <span class="value" id="sensor-freshness-label">—</span>
+      </div>
+      <div class="metric-box wide">
+        <span class="label">Sensor Freshness Score</span>
+        <div class="bar-wrap">
+          <div class="bar" id="sensor-bar"></div>
+        </div>
+        <span class="value" id="sensor-score">—</span>
+      </div>
+      <div class="metric-box wide timestamp-box">
+        <span class="label">Data Recorded</span>
+        <span class="value timestamp" id="sensor-time">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Step 4 : Combined ────────────────────────────── -->
+  <section class="card hidden" id="combined-card">
+    <h2><span class="step">✓</span> Combined Freshness Score</h2>
+
+    <div class="combined-display">
+      <div class="gauge-ring" id="gauge-ring">
+        <span id="final-score">—</span>
+      </div>
+      <span class="value combined-freshness" id="combined-freshness-label">—</span>
+      <p class="formula">60 % ML  +  40 % Sensor</p>
+    </div>
+
+    <button id="reset-btn" class="btn primary">Check Another</button>
+  </section>
+
+</main>
+
+<footer>
+  FreshScan Demo &middot; MobileNetV3 + ThingSpeak
+</footer>
+
+<!-- ─── JS ─────────────────────────────────────────────── -->
+<script>
+const $ = (s) => document.querySelector(s);
+const fileInput  = $("#file-input");
+const dropZone   = $("#drop-zone");
+const preview    = $("#preview");
+const dropPrompt = $("#drop-prompt");
+const analyzeBtn = $("#analyze-btn");
+const sensorBtn  = $("#sensor-btn");
+
+const uploadModeBtn = $("#upload-mode-btn");
+const cameraModeBtn = $("#camera-mode-btn");
+const uploadArea    = $("#upload-area");
+const cameraArea    = $("#camera-area");
+const cameraFeed    = $("#camera-feed");
+const cameraCanvas  = $("#camera-canvas");
+const cameraPreview = $("#camera-preview");
+const captureBtn    = $("#capture-btn");
+const retakeBtn     = $("#retake-btn");
+
+let selectedFile = null;
+let mlResult     = null;
+let cameraStream = null;
+
+/* ── Mode Toggle ────────────────────────────────────── */
+uploadModeBtn.addEventListener("click", () => {
+  uploadModeBtn.classList.add("active");
+  cameraModeBtn.classList.remove("active");
+  uploadArea.classList.remove("hidden");
+  cameraArea.classList.add("hidden");
+  stopCamera();
+});
+
+cameraModeBtn.addEventListener("click", async () => {
+  cameraModeBtn.classList.add("active");
+  uploadModeBtn.classList.remove("active");
+  cameraArea.classList.remove("hidden");
+  uploadArea.classList.add("hidden");
+  await startCamera();
+});
+
+async function startCamera() {
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 960 } }
+    });
+    cameraFeed.srcObject = cameraStream;
+    cameraFeed.classList.add("visible");
+    cameraPreview.classList.remove("visible");
+    captureBtn.classList.remove("hidden");
+    retakeBtn.classList.add("hidden");
+  } catch (e) {
+    alert("Camera access denied or not available: " + e.message);
+    uploadModeBtn.click();
+  }
+}
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  cameraFeed.srcObject = null;
+}
+
+captureBtn.addEventListener("click", () => {
+  cameraCanvas.width  = cameraFeed.videoWidth;
+  cameraCanvas.height = cameraFeed.videoHeight;
+  cameraCanvas.getContext("2d").drawImage(cameraFeed, 0, 0);
+
+  cameraCanvas.toBlob((blob) => {
+    selectedFile = new File([blob], "capture.jpg", { type: "image/jpeg" });
+    cameraPreview.src = URL.createObjectURL(blob);
+    cameraPreview.classList.add("visible");
+    cameraFeed.classList.remove("visible");
+    captureBtn.classList.add("hidden");
+    retakeBtn.classList.remove("hidden");
+    analyzeBtn.disabled = false;
+
+    hideCard("ml-card");
+    hideCard("sensor-card");
+    hideCard("combined-card");
+  }, "image/jpeg", 0.9);
+});
+
+retakeBtn.addEventListener("click", async () => {
+  selectedFile = null;
+  analyzeBtn.disabled = true;
+  cameraPreview.classList.remove("visible");
+  await startCamera();
+});
+
+/* ── Drag & Drop ────────────────────────────────────── */
+dropZone.addEventListener("click", () => fileInput.click());
+
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropZone.classList.add("drag-over");
+});
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  if (!file.type.startsWith("image/")) return;
+  selectedFile = file;
+  const url = URL.createObjectURL(file);
+  preview.src = url;
+  preview.classList.add("visible");
+  dropPrompt.classList.add("hidden-prompt");
+  analyzeBtn.disabled = false;
+
+  // Reset downstream cards
+  hideCard("ml-card");
+  hideCard("sensor-card");
+  hideCard("combined-card");
+}
+
+/* ── Analyze ────────────────────────────────────────── */
+analyzeBtn.addEventListener("click", async () => {
+  if (!selectedFile) return;
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = "Analyzing …";
+
+  const form = new FormData();
+  form.append("image", selectedFile);
+
+  try {
+    const res  = await fetch("/predict", { method: "POST", body: form });
+    const data = await res.json();
+
+    if (data.error) { alert(data.error); return; }
+
+    mlResult = data;
+    $("#fruit-name").textContent      = data.fruit;
+    $("#freshness-label").textContent  = data.freshness_label;
+    $("#freshness-label").className    = "value " + data.freshness_label.toLowerCase();
+    $("#ml-score").textContent         = data.freshness_prob + " %";
+    $("#ml-bar").style.width           = data.freshness_prob + "%";
+    colorBar($("#ml-bar"), data.freshness_prob);
+
+    showCard("ml-card");
+  } catch (e) {
+    alert("Prediction failed: " + e.message);
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = "Analyze Freshness";
+  }
+});
+
+/* ── Sensor ─────────────────────────────────────────── */
+sensorBtn.addEventListener("click", async () => {
+  if (!mlResult) return;
+  sensorBtn.disabled = true;
+  sensorBtn.textContent = "Fetching …";
+
+  try {
+    const res  = await fetch(`/sensor?fruit=${mlResult.fruit}`);
+    const data = await res.json();
+
+    if (data.error) { alert(data.error); return; }
+
+    $("#temperature").textContent  = data.temperature.toFixed(1) + " °C";
+    $("#humidity").textContent     = data.humidity.toFixed(1) + " %";
+    $("#air-quality").textContent  = data.air_quality.toFixed(1);
+    $("#sensor-score").textContent = data.sensor_score.toFixed(2) + " %";
+    $("#sensor-bar").style.width   = Math.min(data.sensor_score, 100) + "%";
+    colorBar($("#sensor-bar"), data.sensor_score);
+
+    const sensorTag = freshnessTag(data.sensor_score);
+    $("#sensor-freshness-label").textContent = sensorTag;
+    $("#sensor-freshness-label").className   = "value " + sensorTag.toLowerCase();
+
+    if (data.recorded_at) {
+      $("#sensor-time").textContent = timeAgo(data.recorded_at);
+    }
+
+    showCard("sensor-card");
+
+    // Auto-combine
+    await computeCombined(mlResult.freshness_prob, data.sensor_score);
+  } catch (e) {
+    alert("Sensor fetch failed: " + e.message);
+  } finally {
+    sensorBtn.disabled = false;
+    sensorBtn.textContent = "Fetch Sensor Data";
+  }
+});
+
+/* ── Combine ────────────────────────────────────────── */
+async function computeCombined(mlScore, sensorScore) {
+  const res  = await fetch("/combine", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ml_score: mlScore, sensor_score: sensorScore }),
+  });
+  const data = await res.json();
+
+  const score = data.final_score;
+  $("#final-score").textContent = score.toFixed(1) + "%";
+  const ring = $("#gauge-ring");
+  ring.style.background = `conic-gradient(${scoreColor(score)} ${score * 3.6}deg, #e9ecef ${score * 3.6}deg)`;
+
+  const combinedTag = freshnessTag(score);
+  $("#combined-freshness-label").textContent = combinedTag;
+  $("#combined-freshness-label").className   = "value combined-freshness " + combinedTag.toLowerCase();
+
+  showCard("combined-card");
+}
+
+/* ── Utilities ──────────────────────────────────────── */
+function showCard(id) { document.getElementById(id).classList.remove("hidden"); }
+function hideCard(id) { document.getElementById(id).classList.add("hidden"); }
+function scoreColor(v) { return v > 65 ? "#22c55e" : v > 40 ? "#f59e0b" : "#ef4444"; }
+function colorBar(el, v) { el.style.background = scoreColor(v); }
+function freshnessTag(score) { return score > 50 ? "Fresh" : "Rotten"; }
+
+function timeAgo(isoString) {
+  const now  = Date.now();
+  const then = new Date(isoString).getTime();
+  const diff = Math.max(0, Math.floor((now - then) / 1000));
+  if (diff < 60)   return diff + "s ago";
+  if (diff < 3600) return Math.floor(diff / 60) + " min ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  return Math.floor(diff / 86400) + "d ago";
+}
+
+/* ── Reset ───────────────────────────────────────────── */
+$("#reset-btn").addEventListener("click", () => {
+  selectedFile = null;
+  mlResult = null;
+  fileInput.value = "";
+  preview.src = "";
+  preview.classList.remove("visible");
+  dropPrompt.classList.remove("hidden-prompt");
+  cameraPreview.classList.remove("visible");
+  stopCamera();
+  uploadModeBtn.click();
+  analyzeBtn.disabled = true;
+  hideCard("ml-card");
+  hideCard("sensor-card");
+  hideCard("combined-card");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+</script>
+</body>
+</html>

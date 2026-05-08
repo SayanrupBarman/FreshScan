@@ -1,0 +1,19 @@
+# Model training artifacts
+model/model.keras
+
+# Training / conversion scripts (not needed for deployment)
+untitled8.py
+convert_model.py
+
+# Environment
+.env
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
