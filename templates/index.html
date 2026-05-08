@@ -18,6 +18,35 @@
 </head>
 <body>
 
+<!-- ─── Loading Skeleton (cold-start screen) ────────────── -->
+<div id="loading-skeleton" style="
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #f4f6f9; gap: 1.2rem; transition: opacity .4s;
+">
+  <div style="font-size: 3rem; animation: bounce 1s infinite alternate;">🍎</div>
+  <p style="font-family: system-ui; font-size: 1.1rem; color: #4f46e5; font-weight: 600;">
+    Waking up the fruit inspector…
+  </p>
+  <p style="font-family: system-ui; font-size: 0.85rem; color: #64748b;">
+    First load takes a moment — we were napping 🍌💤
+  </p>
+  <div style="width: 180px; height: 4px; background: #e2e6ec; border-radius: 4px; overflow: hidden;">
+    <div style="width: 40%; height: 100%; background: #4f46e5; border-radius: 4px; animation: shimmer 1.2s infinite;"></div>
+  </div>
+</div>
+<style>
+  @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-12px); } }
+  @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+</style>
+<script>
+  window.addEventListener("load", () => {
+    const sk = document.getElementById("loading-skeleton");
+    sk.style.opacity = "0";
+    setTimeout(() => sk.remove(), 400);
+  });
+</script>
+
 <!-- ─── Animated Background ─────────────────────────────── -->
 <div class="bg-blobs">
   <div class="blob blob-1"></div>
@@ -294,14 +323,30 @@ function handleFile(file) {
   hideCard("combined-card");
 }
 
+/* ── Resize helper (256×256 before upload) ──────────── */
+function resizeImage(file, size = 256) {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      canvas.getContext("2d").drawImage(img, 0, 0, size, size);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 /* ── Analyze ────────────────────────────────────────── */
 analyzeBtn.addEventListener("click", async () => {
   if (!selectedFile) return;
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = "Analyzing …";
 
+  const resized = await resizeImage(selectedFile);
   const form = new FormData();
-  form.append("image", selectedFile);
+  form.append("image", resized, "image.jpg");
 
   try {
     const res  = await fetch("/predict", { method: "POST", body: form });

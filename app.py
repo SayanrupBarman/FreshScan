@@ -4,11 +4,13 @@ import numpy as np
 import requests
 import onnxruntime as ort
 from flask import Flask, render_template, request, jsonify
+from flask_compress import Compress
 from PIL import Image
 import io
 
 # ── App setup ────────────────────────────────────────────────
 app = Flask(__name__)
+Compress(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model", "model.onnx")
