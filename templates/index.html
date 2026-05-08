@@ -41,9 +41,11 @@
 </style>
 <script>
   window.addEventListener("load", () => {
-    const sk = document.getElementById("loading-skeleton");
-    sk.style.opacity = "0";
-    setTimeout(() => sk.remove(), 400);
+    setTimeout(() => {
+      const sk = document.getElementById("loading-skeleton");
+      sk.style.opacity = "0";
+      setTimeout(() => sk.remove(), 400);
+    }, 2000);
   });
 </script>
 
