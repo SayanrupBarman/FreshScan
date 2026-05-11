@@ -133,15 +133,15 @@ def sensor_qr():
       mode = D  → return hardcoded failsafe values
     """
     body = request.get_json(silent=True) or {}
-    qr_raw = body.get("qr", "")
+    qr_raw = body.get("qr", "").strip()
     fruit = body.get("fruit", "").lower()
 
     if fruit not in ("apple", "banana", "orange"):
         return jsonify({"error": "Invalid or missing fruit parameter"}), 400
 
-    parts = qr_raw.split(":")
+    parts = [p.strip() for p in qr_raw.split(":")]
     if len(parts) != 4 or parts[0] != "FS":
-        return jsonify({"error": "Invalid QR code format"}), 400
+        return jsonify({"error": f"Invalid QR code format. Got: {qr_raw!r}"}), 400
 
     channel, api_key, mode = parts[1], parts[2], parts[3].upper()
 
