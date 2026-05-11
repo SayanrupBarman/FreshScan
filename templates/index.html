@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js");
@@ -141,8 +142,20 @@
       </div>
     </div>
 
-    <button id="sensor-btn" class="btn secondary">Fetch Sensor Data</button>
+    <button id="sensor-btn" class="btn secondary">📷 Scan QR Code</button>
   </section>
+
+  <!-- ─── QR Scanner Modal ──────────────────────────── -->
+  <div id="qr-modal" class="qr-modal hidden">
+    <div class="qr-modal-content">
+      <div class="qr-modal-header">
+        <h3>Scan Sensor QR Code</h3>
+        <button id="qr-close-btn" class="qr-close">&times;</button>
+      </div>
+      <div id="qr-reader"></div>
+      <p class="qr-hint">Point your camera at the sensor QR code</p>
+    </div>
+  </div>
 
   <!-- ─── Step 3 : Sensor Data ─────────────────────────── -->
   <section class="card hidden" id="sensor-card">
@@ -373,14 +386,54 @@ analyzeBtn.addEventListener("click", async () => {
   }
 });
 
-/* ── Sensor ─────────────────────────────────────────── */
-sensorBtn.addEventListener("click", async () => {
+/* ── QR Scanner ─────────────────────────────────────── */
+const qrModal    = $("#qr-modal");
+const qrCloseBtn = $("#qr-close-btn");
+let html5QrCode  = null;
+
+sensorBtn.addEventListener("click", () => {
   if (!mlResult) return;
+  qrModal.classList.remove("hidden");
+  startQrScanner();
+});
+
+qrCloseBtn.addEventListener("click", stopAndCloseQr);
+qrModal.addEventListener("click", (e) => {
+  if (e.target === qrModal) stopAndCloseQr();
+});
+
+function startQrScanner() {
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    onQrSuccess,
+    () => {} // ignore scan failures
+  ).catch((err) => {
+    alert("Camera error: " + err);
+    stopAndCloseQr();
+  });
+}
+
+function stopAndCloseQr() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+    html5QrCode = null;
+  }
+  qrModal.classList.add("hidden");
+}
+
+async function onQrSuccess(decodedText) {
+  stopAndCloseQr();
   sensorBtn.disabled = true;
   sensorBtn.textContent = "Fetching …";
 
   try {
-    const res  = await fetch(`/sensor?fruit=${mlResult.fruit}`);
+    const res = await fetch("/sensor-qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qr: decodedText, fruit: mlResult.fruit }),
+    });
     const data = await res.json();
 
     if (data.error) { alert(data.error); return; }
@@ -401,16 +454,14 @@ sensorBtn.addEventListener("click", async () => {
     }
 
     showCard("sensor-card");
-
-    // Auto-combine
     await computeCombined(mlResult.freshness_prob, data.sensor_score);
   } catch (e) {
     alert("Sensor fetch failed: " + e.message);
   } finally {
     sensorBtn.disabled = false;
-    sensorBtn.textContent = "Fetch Sensor Data";
+    sensorBtn.textContent = "📷 Scan QR Code";
   }
-});
+}
 
 /* ── Combine ────────────────────────────────────────── */
 async function computeCombined(mlScore, sensorScore) {

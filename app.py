@@ -4,13 +4,11 @@ import numpy as np
 import requests
 import onnxruntime as ort
 from flask import Flask, render_template, request, jsonify
-from flask_compress import Compress
 from PIL import Image
 import io
 
 # ── App setup ────────────────────────────────────────────────
 app = Flask(__name__)
-Compress(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model", "model.onnx")
@@ -112,6 +110,76 @@ def sensor():
     score_key = f"{fruit}_score"
     sensor_score = sensor_data.get(score_key, 0)
 
+    return jsonify({**sensor_data, "sensor_score": sensor_score})
+
+
+# ── Hardcoded failsafe sensor values ─────────────────────────
+FAILSAFE_SENSOR = {
+    "temperature": 24.5,
+    "humidity": 62.0,
+    "air_quality": 1138.0,
+    "banana_score": 71.0,
+    "apple_score": 78.0,
+    "orange_score": 74.5,
+}
+
+
+@app.route("/sensor-qr", methods=["POST"])
+def sensor_qr():
+    """
+    Accepts QR payload and fruit name.
+    QR format:  FS:<channel>:<api_key>:<mode>
+      mode = L  → live fetch from ThingSpeak
+      mode = D  → return hardcoded failsafe values
+    """
+    body = request.get_json(silent=True) or {}
+    qr_raw = body.get("qr", "")
+    fruit = body.get("fruit", "").lower()
+
+    if fruit not in ("apple", "banana", "orange"):
+        return jsonify({"error": "Invalid or missing fruit parameter"}), 400
+
+    parts = qr_raw.split(":")
+    if len(parts) != 4 or parts[0] != "FS":
+        return jsonify({"error": "Invalid QR code format"}), 400
+
+    channel, api_key, mode = parts[1], parts[2], parts[3].upper()
+
+    if mode == "D":
+        # ── Failsafe: return hardcoded values ────────────
+        from datetime import datetime, timezone
+        sensor_data = {
+            **FAILSAFE_SENSOR,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        score_key = f"{fruit}_score"
+        sensor_score = sensor_data.get(score_key, 0)
+        return jsonify({**sensor_data, "sensor_score": sensor_score})
+
+    # ── Live mode: fetch from ThingSpeak ─────────────────
+    url = (
+        f"https://api.thingspeak.com/channels/{channel}"
+        f"/feeds/last.json?api_key={api_key}"
+    )
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"ThingSpeak request failed: {e}"}), 502
+
+    sensor_data = {
+        "temperature": float(data.get("field1", 0)),
+        "humidity": float(data.get("field2", 0)),
+        "air_quality": float(data.get("field3", 0)),
+        "banana_score": float(data.get("field4", 0)),
+        "apple_score": float(data.get("field5", 0)),
+        "orange_score": float(data.get("field6", 0)),
+        "recorded_at": data.get("created_at", ""),
+    }
+
+    score_key = f"{fruit}_score"
+    sensor_score = sensor_data.get(score_key, 0)
     return jsonify({**sensor_data, "sensor_score": sensor_score})
 
 
