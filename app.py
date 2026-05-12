@@ -42,6 +42,13 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
     return np.expand_dims(arr, axis=0)  # (1, 256, 256, 3)
 
 
+def scale_freshness(raw_score: float) -> float:
+    """Rescale ML freshness: 0-40 → 0-50, 40-100 → 50-100."""
+    if raw_score <= 40:
+        return raw_score * (50 / 40)
+    return 50 + (raw_score - 40) * (50 / 60)
+
+
 # ── Routes ───────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -70,11 +77,13 @@ def predict():
     freshness_prob = float(preds[0][0][0])
     fruit_idx = int(np.argmax(preds[1][0]))
     fruit_name = FRUIT_NAMES[fruit_idx]
+    raw_pct = freshness_prob * 100
+    scaled_pct = scale_freshness(raw_pct)
     freshness_label = "Fresh" if freshness_prob > THRESHOLD else "Rotten"
 
     return jsonify({
         "fruit": fruit_name,
-        "freshness_prob": round(freshness_prob * 100, 2),
+        "freshness_prob": round(scaled_pct, 2),
         "freshness_label": freshness_label,
         "threshold": round(THRESHOLD * 100, 2),
     })
@@ -192,7 +201,17 @@ def combine():
     if ml_score is None or sensor_score is None:
         return jsonify({"error": "ml_score and sensor_score required"}), 400
 
-    final_score = 0.6 * float(ml_score) + 0.4 * float(sensor_score)
+    ml = float(ml_score)
+    sensor = float(sensor_score)
+
+    # Determine case based on either score falling in a range
+    if 35 <= ml <= 65 or 35 <= sensor <= 65:
+        final_score = 0.6 * sensor + 0.4 * ml
+    elif ml > 65 or sensor > 65:
+        final_score = 0.6 * ml + 0.4 * sensor
+    else:
+        final_score = 0.5 * ml + 0.5 * sensor
+
     return jsonify({"final_score": round(final_score, 2)})
 
 
