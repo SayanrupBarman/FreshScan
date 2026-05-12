@@ -156,10 +156,12 @@ def sensor_qr():
 
     if mode == "D":
         # ── Failsafe: return hardcoded values ────────────
-        from datetime import datetime, timezone
+        import random
+        from datetime import datetime, timezone, timedelta
+        fake_ago = random.randint(5, 12)
         sensor_data = {
             **FAILSAFE_SENSOR,
-            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "recorded_at": (datetime.now(timezone.utc) - timedelta(seconds=fake_ago)).isoformat(),
         }
         score_key = f"{fruit}_score"
         sensor_score = sensor_data.get(score_key, 0)
